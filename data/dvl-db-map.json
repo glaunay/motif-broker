@@ -1,0 +1,4 @@
+{
+    "^[ATCG]{4}[C][ATCG]{18}$" : "crispr",
+    "^[ATCG]{4}[A][ATCG]{18}$" : "crispr2"
+}
