@@ -24,6 +24,10 @@ program
   .option('-v, --verbosity [logLevel]', 'Set log level', setLogLevel, 'info')
 .parse(process.argv)
 
+/* Desired format
+[word][organism][reference] = [(coordinate)
+*/
+
 //node build/index.js --map data/dvl-db-map.json -v debug
 /*
 curl --header "Content-Type: application/json" --request POST --data '{"keys": [ "AAAAAAAAAATTTCAATTATAGG", "AAAAAAAATTATGTTCTTGACGG","AAAAAAACGGACATCCTTTATGG", "AAAACTTCATGCAAGTTTTGCGG","AAAACGGGTTGAATAGTCTCTGG","AAAACGACAATTGCCGTTTTCGG"] }' http://localhost:2345/bulk_request
@@ -163,8 +167,15 @@ class queue {
             } );
         });
 
-        return Promise.all(promisePackets)
 
+        let reducedPromise = new Promise ((resolve, reject) => {
+            Promise.all(promisePackets).then( (data) => { 
+                resolve (data.reduce( (arr:any[], d:any[]) => arr.concat(d) , []) );
+            });
+        });
+        
+        //return Promise.all(promisePackets)
+        return reducedPromise;
         /*
         return new Promise( (resolve, reject)=> {
             setTimeout( ()=> {
@@ -212,18 +223,86 @@ class dbRequest {
         for (let q of this.queuePool){
             data.push( await q.qFlush() );
         }
-        return data;
+        logger.debug(`flushSequential content:\n${utils.inspect(data, {showHidden: false, depth: null})}`);
+        return this.pullFlattenLitt(data);
     }
 
     async flushParallel():Promise<any> {
-        await Promise.all( this.queuePool.map(q => q.qFlush()) );
+        let data = await Promise.all( this.queuePool.map(q => q.qFlush()) );
+        logger.debug(`flushParallel content:\n${utils.inspect(data, {showHidden: false, depth: null})}`);
+        return this.pullFlattenLitt(data);
     }
+
+    pullFlattenArr(data:any):Promise<any>/*any[]*/ {
+        for (let e of data.entries()) {
+            logger.debug(`### Single queue Flush in flatten [${this.queuePool[ e[0] ].endPoint}]`);
+            logger.debug(`### ==>\n${utils.inspect(e[1], {showHidden: false, depth: null})}`);
+        }
+
+        //synchronous reduction
+        //return data.reduce( (arr:any[], curr:any[]) => arr.concat(curr), [] );
+        // We reduce to a list using promise to avoid main event loop overload
+        let _f = function (a:any[],b:any[]):Promise<any> {
+
+            return new Promise ((resolve, reject) =>  { 
+                setTimeout ( () => resolve(a.concat(b)), 5 );
+            });
+        }
+        return data.reduce( async (previousPromise, nextDatum) => {
+            let arr = await previousPromise;
+            return _f(arr, nextDatum);
+        }, Promise.resolve([])) 
+    }
+    pullFlattenLitt(data:any):Promise<any>/*any[]*/ {
+        for (let e of data.entries()) {
+            logger.debug(`### Single queue Flush in flatten [${this.queuePool[ e[0] ].endPoint}]`);
+            logger.debug(`### ==>\n${utils.inspect(e[1], {showHidden: false, depth: null})}`);
+        }
+
+        
+        // We reduce to a litteral using promise to avoid main event loop overload
+        let _f = function (a:any, b:any):Promise<any> {
+
+            return new Promise ((resolve, reject) =>  { 
+                setTimeout ( () => {
+                    for (let e of b) {
+                        if ('error' in e)
+                            continue;
+                        if (! ('id' in e))                    
+                            throw(`No "id" in ${utils.inspect(e, {showHidden: false, depth: null})}`);
+                        if (e['id'] in a)
+                            throw(`Common "id\" in accumulator:\n${utils.inspect(a, {showHidden: false, depth: null})}\n
+                            and curr datum\n${utils.inspect(e, {showHidden: false, depth: null})}`);
+
+                        a[ e['id'] ] = {};
+                        for (let k in e) {
+                            if (k === 'id')
+                                continue;
+                                a[ e['id'] ][k] = e[k];
+                        }
+                    }
+                    resolve(a);                 
+                }
+                , 5 );
+            });
+        }
+        return data.reduce( async (previousPromise, nextDatum) => {
+            let arr = await previousPromise;
+            return _f(arr, nextDatum);
+        }, Promise.resolve({})) 
+    }
+
 }
 
 
 app.post(`/bulk_request`, function (req, res) {
 
     logger.info(`Receiving request`);
+   /*
+    res.json({"request" : "222"});
+    return;
+    */
+
     logger.info(`${utils.inspect(req.body, {showHidden: false, depth: null})}`);
     let busDB = new dbRequest(program.map, program.root, program.size);
     busDB.load(req.body.keys);
@@ -231,6 +310,9 @@ app.post(`/bulk_request`, function (req, res) {
         logger.info(`FLUSH RESULTS`);
         logger.info(`${utils.inspect(data, {showHidden: false, depth: null})}`);
         res.json({"request" : data});
+    })
+    .catch((err)=>{
+        logger.error(`${err}`);
     });
     
     //res.json({"status": "ok" });
