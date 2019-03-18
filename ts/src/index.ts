@@ -11,8 +11,7 @@ import jsonfile = require('jsonfile')
 import request = require('request');
 
 let app = express();
-app.use(express.json());
-
+app.use(express.json({limit:'50mb'}));
 
 program
   .version('0.1.0')
