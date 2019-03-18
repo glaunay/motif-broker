@@ -325,7 +325,7 @@ startupCheck(program.root).then ( () => {
     });
 }).catch((err)=>{
         logger.error(`No response from couchDB at ${program.root}, exiting`);
-        logger.debug(`${utils.inspect(err, {showHidden: false, depth: null})}`);
+        logger.error(`->${utils.inspect(err, {showHidden: false, depth: null})}<-`);
 });
 
 /*async function () {
