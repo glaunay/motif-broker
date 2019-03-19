@@ -116,11 +116,11 @@ class queue {
     qFlush(): Promise<any> {
         
         let readyPackets = [];
-        for (let index = 0; index < this.batchSize; index += this.batchSize) {
+        for (let index = 0; index < this.pool.length; index += this.batchSize) {
             readyPackets.push( this.pool.slice(index, index + this.batchSize) );
         }
-        logger.debug(`qFlushing this:\n${utils.inspect(readyPackets, {showHidden: false, depth: null})}`);
-
+        logger.silly(`qFlushing this:\n${utils.inspect(readyPackets, {showHidden: false, depth: null})}`);
+        logger.debug(`${this.endPoint} bSize : ${this.batchSize} -> led to slices key set of ${readyPackets.length} batch`);
         let promisePackets = readyPackets.map((packet:string[])=> {
             let couchRequestData = {
                 method: 'POST',
@@ -166,9 +166,9 @@ class queue {
             } );
         });
 
-
         let reducedPromise = new Promise ((resolve, reject) => {
             Promise.all(promisePackets).then( (data) => { 
+                logger.debug(`${this.endPoint} ${promisePackets.length} promises done`);
                 resolve (data.reduce( (arr:any[], d:any[]) => arr.concat(d) , []) );
             });
         });
@@ -233,10 +233,10 @@ class dbRequest {
     }
 
     pullFlattenArr(data:any):Promise<any>/*any[]*/ {
-        for (let e of data.entries()) {
+        /*for (let e of data.entries()) {
             logger.debug(`### Single queue Flush in flatten [${this.queuePool[ e[0] ].endPoint}]`);
             logger.debug(`### ==>\n${utils.inspect(e[1], {showHidden: false, depth: null})}`);
-        }
+        }*/
 
         //synchronous reduction
         //return data.reduce( (arr:any[], curr:any[]) => arr.concat(curr), [] );
@@ -296,18 +296,20 @@ class dbRequest {
 
 app.post(`/bulk_request`, function (req, res) {
 
-    logger.info(`Receiving request`);
+    logger.info(`Receiving request of ${req.body.keys.length} elements`);
    /*
     res.json({"request" : "222"});
     return;
     */
 
-    logger.info(`${utils.inspect(req.body, {showHidden: false, depth: null})}`);
+    logger.debug(`${utils.inspect(req.body, {showHidden: false, depth: null})}`);
     let busDB = new dbRequest(program.map, program.root, program.size);
     busDB.load(req.body.keys);
     busDB.flushSequential().then((data)=> {
-        logger.info(`FLUSH RESULTS`);
-        logger.info(`${utils.inspect(data, {showHidden: false, depth: null})}`);
+       // logger.info(`FLUSH RESULTS`);
+        //logger.info(`${utils.inspect(data, {showHidden: false, depth: null})}`);
+
+        logger.debug(`Returning a bulk_request of ${Object.keys(data).length} elements`);
         res.json({"request" : data});
     })
     .catch((err)=>{
