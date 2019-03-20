@@ -293,8 +293,17 @@ class dbRequest {
 
 }
 
+app.get(`/handshake`,  (req,res) => {
+    res.json({"sucess" : "handshake"});
+});
 
-app.post(`/bulk_request`, function (req, res) {
+app.post(`/bulk_request`, (req, res) => {
+
+    if (!req.body.hasOwnProperty('keys') ) {
+        logger.error(`Malformed request:\n${utils.inspect(req.body, {showHidden: false, depth: null})}`);
+        res.json({"error" : "Malformed request"});
+        return;
+    }
 
     logger.info(`Receiving request of ${req.body.keys.length} elements`);
    /*
@@ -314,6 +323,7 @@ app.post(`/bulk_request`, function (req, res) {
     })
     .catch((err)=>{
         logger.error(`${err}`);
+        res.json({"error" : "Database error"});
     });
     
     //res.json({"status": "ok" });
