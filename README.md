@@ -1,4 +1,4 @@
-# motif-broker-2
+# motif-broker
 Front-end service to dispatch and aggregate motif requests on the list of couchDB databases, using [couchdb-dispatcher](https://www.npmjs.com/package/couchdb-dispatcher).
 
 ### Running the service
