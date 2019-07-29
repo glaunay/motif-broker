@@ -4,7 +4,9 @@
       "baseUrl": ".",
       "lib": [
           "dom",
-          "es7"
+          "es6",
+          "es7",
+          "es2017"
       ],
       "listEmittedFiles" : true,
       "listFiles" : false,
@@ -19,12 +21,11 @@
       },
       "preserveConstEnums" : true,
       "removeComments" : false,
-      "target": "ES6"
+      "target": "ES6",
+      "esModuleInterop": true
   },
   "files": [ // path to the files to compile
-      "./ts/src/index.ts",
-      "./ts/src/logger.ts",
-      "./ts/src/ghost.ts"
+      "./ts/src/index.ts"
   ],
   "exclude" : [  
    // "../taskobject"
